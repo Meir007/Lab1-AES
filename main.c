@@ -17,7 +17,6 @@ void MixColumns(StateMatrix *state) {
         result.data[3][c] = (unsigned char)((state->data[0][c] << 1) ^ state->data[1][c] ^ state->data[2][c] ^ (state->data[2][c] << 1) ^ (state->data[3][c] << 1));
     }
     memcpy(state->data, result.data, 16);
-    
 }
 
 void *ThreadMixColumns(void *arg) {
@@ -43,7 +42,6 @@ int readMatricesFromFile(const char *filename, StateMatrix matrices[], int N) {
 
     fclose(file);
     return 1;
-    
 }
 
 int writeMatricesToFile(const char *filename, StateMatrix matrices[], int N, double executionTime, size_t dataSizeInBytes) {
@@ -67,7 +65,6 @@ int writeMatricesToFile(const char *filename, StateMatrix matrices[], int N, dou
 
     fclose(file);
     return 1;
-    
 }
 
 void generateRandomData(const char *filename, size_t sizeInMB) {
@@ -87,7 +84,6 @@ void generateRandomData(const char *filename, size_t sizeInMB) {
     }
 
     fclose(file);
-   
 }
 
 int main(int argc, char *argv[]) {
@@ -97,42 +93,54 @@ int main(int argc, char *argv[]) {
     }
 
     const char *filename = argv[1];
-    size_t sizeInMB = atoi(argv[2);
+    size_t sizeInMB = atoi(argv[2]);
 
     if (sizeInMB <= 0) {
         fprintf(stderr, "Invalid size in MB.\n");
         return 1;
     }
 
-    generateRandomData(filename, sizeInMB);
-    printf("Generated %lu MB of random data and saved to %s\n", sizeInMB, filename);
+    const int num_experiments = 5;
+    const int data_sizes[] = {1, 2, 4, 8, 16}; // Размеры данных в мегабайтах
+    const int num_threads[] = {1, 2, 4, 8, 16}; // Разные степени параллелизма
 
-    const int N = 10; // Количество матриц
-    StateMatrix matrices[N];
-
-    if (readMatricesFromFile(filename, matrices, N)) {
-        pthread_t threads[N];
-
-        clock_t start = clock(); // Засечь начальное время
-
-        for (int i = 0; i < N; i++) {
-            pthread_create(&threads[i], NULL, ThreadMixColumns, &matrices[i]);
-        }
-
-        for (int i = 0; i < N; i++) {
-            pthread_join(threads[i], NULL);
-        }
-
-        clock_t end = clock(); // Засечь конечное время
-        double executionTime = (double)(end - start) / CLOCKS_PER_SEC;
-
-        if (writeMatricesToFile("output.dat", matrices, N, executionTime, sizeInMB * 1024 * 1024)) {
-            printf("MixColumns operation completed and saved to output.dat\n");
-            return 0;
-        } else {
-            return 1;
-        }
-    } else {
+    FILE *outputFile = fopen("execution_times.txt", "w");
+    if (outputFile == NULL) {
+        perror("Unable to open output file");
         return 1;
     }
+
+    for (int i = 0; i < num_experiments; i++) {
+        size_t sizeInMB = data_sizes[i];
+        generateRandomData("input.dat", sizeInMB);
+
+        for (int j = 0; j < sizeof(num_threads) / sizeof(num_threads[0]); j++) {
+            int N = 10; // Количество матриц
+            StateMatrix matrices[N];
+
+            if (readMatricesFromFile("input.dat", matrices, N)) {
+                pthread_t threads[num_threads[j]];
+                clock_t start = clock();
+
+                for (int k = 0; k < N; k++) {
+                    pthread_create(&threads[k % num_threads[j]], NULL, ThreadMixColumns, &matrices[k]);
+                }
+
+                for (int k = 0; k < N; k++) {
+                    pthread_join(threads[k % num_threads[j]], NULL);
+                }
+
+                clock_t end = clock();
+                double executionTime = (double)(end - start) / CLOCKS_PER_SEC;
+
+                fprintf(outputFile, "Data Size: %d MB, Threads: %d, Execution Time: %lf seconds\n", data_sizes[i], num_threads[j], executionTime);
+            }
+        }
+    }
+
+    fclose(outputFile);
+
+    printf("MixColumns operation completed and saved to execution_times.txt\n");
+
+    return 0;
 }
