@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <pthread.h>
 
 typedef struct {
     unsigned char data[4][4];
@@ -16,6 +17,13 @@ void MixColumns(StateMatrix *state) {
         result.data[3][c] = (unsigned char)((state->data[0][c] << 1) ^ state->data[1][c] ^ state->data[2][c] ^ (state->data[2][c] << 1) ^ (state->data[3][c] << 1));
     }
     memcpy(state->data, result.data, 16);
+    
+}
+
+void *ThreadMixColumns(void *arg) {
+    StateMatrix *matrices = (StateMatrix *)arg;
+    MixColumns(matrices);
+    pthread_exit(NULL);
 }
 
 int readMatricesFromFile(const char *filename, StateMatrix matrices[], int N) {
@@ -35,6 +43,7 @@ int readMatricesFromFile(const char *filename, StateMatrix matrices[], int N) {
 
     fclose(file);
     return 1;
+    
 }
 
 int writeMatricesToFile(const char *filename, StateMatrix matrices[], int N, double executionTime, size_t dataSizeInBytes) {
@@ -58,6 +67,7 @@ int writeMatricesToFile(const char *filename, StateMatrix matrices[], int N, dou
 
     fclose(file);
     return 1;
+    
 }
 
 void generateRandomData(const char *filename, size_t sizeInMB) {
@@ -77,6 +87,7 @@ void generateRandomData(const char *filename, size_t sizeInMB) {
     }
 
     fclose(file);
+   
 }
 
 int main(int argc, char *argv[]) {
@@ -86,7 +97,7 @@ int main(int argc, char *argv[]) {
     }
 
     const char *filename = argv[1];
-    size_t sizeInMB = atoi(argv[2]);
+    size_t sizeInMB = atoi(argv[2);
 
     if (sizeInMB <= 0) {
         fprintf(stderr, "Invalid size in MB.\n");
@@ -100,10 +111,16 @@ int main(int argc, char *argv[]) {
     StateMatrix matrices[N];
 
     if (readMatricesFromFile(filename, matrices, N)) {
+        pthread_t threads[N];
+
         clock_t start = clock(); // Засечь начальное время
 
         for (int i = 0; i < N; i++) {
-            MixColumns(&matrices[i]);
+            pthread_create(&threads[i], NULL, ThreadMixColumns, &matrices[i]);
+        }
+
+        for (int i = 0; i < N; i++) {
+            pthread_join(threads[i], NULL);
         }
 
         clock_t end = clock(); // Засечь конечное время
